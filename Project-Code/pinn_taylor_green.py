@@ -16,13 +16,6 @@ print("Using:", device)
 Re = 100.0
 nu = 1.0 / Re
 
-# ---------------------------------------------------------------------------
-# Run metadata (used for output filenames / tag). Reflects the ACTUAL
-# architecture below (unchanged from the original script: 6 hidden layers,
-# width 256, activation SiLU). Only the typo `nn.SilU` -> `nn.SiLU` was fixed
-# so the model can actually be constructed; nothing else about the
-# architecture / training loop was changed.
-# ---------------------------------------------------------------------------
 ACTIVATION_NAME = "SiLU"
 N_HIDDEN_LAYERS = 6
 WIDTH = 256
@@ -179,7 +172,6 @@ for epoch in range(epochs):
     optimizer.step()
     xm.mark_step()
 
-    # NEW: log every 500 epochs (same cadence as the original print), plus
     # always capture the very last epoch so loss_history has a final entry.
     if epoch % 500 == 0 or epoch == epochs - 1:
         entry = {
@@ -219,7 +211,7 @@ def relative_l2_error(pred, exact):
     return (torch.linalg.vector_norm(pred - exact) / (torch.linalg.vector_norm(exact) + 1e-12)).item()
 
 
-l2_errors_by_time = []  # <-- NEW: keep the full per-time table
+l2_errors_by_time = []
 for t_value in [2.0, 10.0, 32.0, 50.0, 100.0]:
     T = torch.full_like(X, t_value)
     with torch.no_grad():
@@ -248,15 +240,14 @@ with torch.no_grad():
 
 u_pred = u_pred.cpu().numpy().reshape(N_test, N_test)
 u_exact = u_exact.cpu().numpy().reshape(N_test, N_test)
-v_pred = v_pred.cpu().numpy().reshape(N_test, N_test)  # <-- NEW
-v_exact = v_exact.cpu().numpy().reshape(N_test, N_test)  # <-- NEW
-p_pred = p_pred.cpu().numpy().reshape(N_test, N_test)  # <-- NEW
-p_exact = p_exact.cpu().numpy().reshape(N_test, N_test)  # <-- NEW
+v_pred = v_pred.cpu().numpy().reshape(N_test, N_test)
+v_exact = v_exact.cpu().numpy().reshape(N_test, N_test)
+p_pred = p_pred.cpu().numpy().reshape(N_test, N_test)
+p_exact = p_exact.cpu().numpy().reshape(N_test, N_test)
 X_plot, Y_plot = X.cpu().numpy(), Y.cpu().numpy()
 
 # ---------------------------------------------------------------------------
-# NEW: 3x3 grid (rows = u, v, p ; cols = Exact, PINN, |Error|), same style
-# as the reference figure.
+# NEW: 3x3 grid (rows = u, v, p ; cols = Exact, PINN, |Error|)
 # ---------------------------------------------------------------------------
 fields = [
     ("u", u_exact, u_pred),

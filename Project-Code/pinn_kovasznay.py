@@ -16,12 +16,6 @@ Re = 20.0
 nu = 1.0 / Re
 lambda_val = (Re / 2.0) - np.sqrt((Re**2 / 4.0) + 4.0 * np.pi**2)
 
-# ---------------------------------------------------------------------------
-# Run metadata (used for output filenames / tag). Reflects the ACTUAL
-# architecture below (unchanged from the original script: 4 hidden layers,
-# width 64, activation Tanh). Nothing about the architecture / training loop
-# was changed, only saving/plotting/logging features were added.
-# ---------------------------------------------------------------------------
 ACTIVATION_NAME = "Tanh"
 N_HIDDEN_LAYERS = 4
 WIDTH = 64
@@ -77,20 +71,20 @@ y_b_np = np.concatenate([
 
 u_b_np, v_b_np, _ = exact_solution(x_b_np, y_b_np)
 
-x_b = torch.tensor(x_b_np, dtype=torch.float32, device=device)  # <-- FIX: to(device)
-y_b = torch.tensor(y_b_np, dtype=torch.float32, device=device)  # <-- FIX: to(device)
-u_b = torch.tensor(u_b_np, dtype=torch.float32, device=device)  # <-- FIX: to(device)
-v_b = torch.tensor(v_b_np, dtype=torch.float32, device=device)  # <-- FIX: to(device)
+x_b = torch.tensor(x_b_np, dtype=torch.float32, device=device)
+y_b = torch.tensor(y_b_np, dtype=torch.float32, device=device)
+u_b = torch.tensor(u_b_np, dtype=torch.float32, device=device)
+v_b = torch.tensor(v_b_np, dtype=torch.float32, device=device)
 
 # train
-model = PINN_NavierStokes().to(device)  # <-- FIX: to(device)
+model = PINN_NavierStokes().to(device)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 epochs = 5000
 
-loss_history = []  # <-- NEW: collected for the JSON log
+loss_history = []  # <-- collected for the JSON log
 
 print("Training started...")
-training_start = time.time()  # <-- NEW
+training_start = time.time()
 
 for epoch in range(epochs):
     optimizer.zero_grad()
@@ -127,8 +121,6 @@ for epoch in range(epochs):
     optimizer.step()
     xm.mark_step()
 
-    # NEW: log every 500 epochs (same cadence as the original print), plus
-    # always capture the very last epoch so loss_history has a final entry.
     if epoch % 500 == 0 or epoch == epochs - 1:
         entry = {
             "epoch": epoch,
@@ -166,17 +158,17 @@ with torch.no_grad():
 U_pred = u_pred.cpu().numpy().reshape(100, 100)  # <-- FIX: .cpu() before numpy
 V_pred = v_pred.cpu().numpy().reshape(100, 100)  # <-- FIX: .cpu() before numpy
 P_pred = p_pred.cpu().numpy().reshape(100, 100)  # <-- FIX: .cpu() before numpy
-U_exact, V_exact, P_exact = exact_solution(X, Y)  # <-- NEW: also compute v, p exact
+U_exact, V_exact, P_exact = exact_solution(X, Y)
 
 def relative_l2_error(pred, exact):  # <-- NEW
     return np.linalg.norm(exact - pred, 2) / np.linalg.norm(exact, 2)
 
 error_u = relative_l2_error(U_pred, U_exact)
-error_v = relative_l2_error(V_pred, V_exact)  # <-- NEW
-error_p = relative_l2_error(P_pred, P_exact)  # <-- NEW
+error_v = relative_l2_error(V_pred, V_exact)
+error_p = relative_l2_error(P_pred, P_exact)
 print(f"Relative L2 Error for u-velocity: {error_u:.4e}")
-print(f"Relative L2 Error for v-velocity: {error_v:.4e}")  # <-- NEW
-print(f"Relative L2 Error for p:          {error_p:.4e}")  # <-- NEW
+print(f"Relative L2 Error for v-velocity: {error_v:.4e}")
+print(f"Relative L2 Error for p:          {error_p:.4e}")
 
 # ---------------------------------------------------------------------------
 # NEW: 3x3 grid (rows = u, v, p ; cols = Exact, PINN, |Error|)

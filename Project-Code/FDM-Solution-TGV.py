@@ -3,10 +3,6 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-# =====================================================================
-# 1. Analytical Solution (Taylor-Green Vortex) — เหมือนกับที่ใช้ใน PINN
-#    (V0 = L = rho = 1 จึงตัดออกจากสูตรเพื่อความกระชับ)
-# =====================================================================
 Re = 100.0
 nu = 1.0 / Re
 
@@ -19,18 +15,14 @@ def exact_solution(x, y, t):`
     return u, v, p
 
 def exact_vorticity(x, y, t):
-    # omega = v_x - u_y ; อนุพันธ์ตรงของ exact_solution ข้างบน
     decay_uv = np.exp(-2.0 * nu * t)
     return -2.0 * np.cos(x) * np.cos(y) * decay_uv
 
-# =====================================================================
-# 2. Grid & Domain (periodic ทุกด้าน จึงไม่ใส่จุดปลาย endpoint ซ้ำ)
-# =====================================================================
 X_MIN, X_MAX = -math.pi, math.pi
 Y_MIN, Y_MAX = -math.pi, math.pi
 T_MIN, T_MAX = 0.0, 100.0
 
-N = 100  # จำนวนจุด grid ต่อแกน (เท่ากับ N_test ที่ใช้ประเมินผลฝั่ง PINN)
+N = 100 
 x = np.linspace(X_MIN, X_MAX, N, endpoint=False)
 y = np.linspace(Y_MIN, Y_MAX, N, endpoint=False)
 dx = x[1] - x[0]
@@ -38,14 +30,13 @@ dy = y[1] - y[0]
 X, Y = np.meshgrid(x, y, indexing="xy")
 
 dt = 0.02
-n_steps = int(round((T_MAX - T_MIN) / dt))  # = 5000, เท่ากับ epochs ของ PINN โดยตั้งใจ
+n_steps = int(round((T_MAX - T_MIN) / dt))
 
-# --- เตรียม wavenumber สำหรับแก้ Poisson equation ด้วย FFT (periodic BC) ---
 kx = 2.0 * np.pi * np.fft.fftfreq(N, d=dx)
 ky = 2.0 * np.pi * np.fft.fftfreq(N, d=dy)
 KX, KY = np.meshgrid(kx, ky, indexing="xy")
 K2 = KX ** 2 + KY ** 2
-K2[0, 0] = 1.0  # กันหารศูนย์ที่ mode เฉลี่ย (ค่าคงที่จะถูกกำหนดเป็น 0 ทีหลังอยู่แล้ว)
+K2[0, 0] = 1.0
 
 def solve_poisson_fft(rhs):
     """ แก้ ∇²f = rhs แบบ periodic ด้วย FFT, กำหนดให้ mean(f) = 0 (เหมือน exact solution) """
@@ -66,35 +57,25 @@ def d2dx2(f):
 def d2dy2(f):
     return (np.roll(f, -1, axis=0) - 2.0 * f + np.roll(f, 1, axis=0)) / dy ** 2
 
-# =====================================================================
-# 3. Initial Condition (t = 0)
-# =====================================================================
 omega = exact_vorticity(X, Y, 0.0).copy()
 
-# =====================================================================
-# 4. Time-Marching Loop (Explicit Euler + Central FD)
-#    เทียบเท่ากับ training loop ของฝั่ง PINN — พิมพ์ความคืบหน้า + เวลาที่ใช้
-# =====================================================================
 save_times = [2.0, 10.0, 32.0, 50.0, 100.0]
-saved_fields = {}  # เก็บ (u, v, p) ที่เวลาต่างๆ ไว้ตรวจสอบ error / plot
+saved_fields = {} 
 
 print("FDM time-marching started...")
 fdm_start_time = time.time()
 
 t_current = 0.0
 for step in range(1, n_steps + 1):
-    # -- แก้ Poisson หา streamfunction แล้วดึง u, v ออกมา --
-    psi = solve_poisson_fft(-omega)          # ∇²psi = -omega
+    psi = solve_poisson_fft(-omega)
     u = ddy(psi)
     v = -ddx(psi)
 
-    # -- อนุพันธ์ของ vorticity (FDM) --
     omega_x = ddx(omega)
     omega_y = ddy(omega)
     omega_xx = d2dx2(omega)
     omega_yy = d2dy2(omega)
 
-    # -- Vorticity transport equation: omega_t + u*omega_x + v*omega_y = nu*(omega_xx+omega_yy) --
     omega_rhs = -(u * omega_x + v * omega_y) + nu * (omega_xx + omega_yy)
     omega = omega + dt * omega_rhs
     t_current = step * dt
@@ -103,7 +84,6 @@ for step in range(1, n_steps + 1):
         elapsed_so_far = time.time() - fdm_start_time
         print(f"Step: {step:5d} | t = {t_current:6.2f} | max|omega| = {np.max(np.abs(omega)):.4e} | Elapsed: {elapsed_so_far:8.2f}s")
 
-    # -- บันทึก u, v, p ที่ค่า t ที่สนใจ (คำนวณเพิ่มอีกนิดเฉพาะจุดที่บันทึก) --
     for t_save in save_times:
         if abs(t_current - t_save) < dt / 2 and t_save not in saved_fields:
             psi_s = solve_poisson_fft(-omega)
@@ -111,7 +91,7 @@ for step in range(1, n_steps + 1):
             v_s = -ddx(psi_s)
             u_x = ddx(u_s); u_y = ddy(u_s)
             v_x = ddx(v_s); v_y = ddy(v_s)
-            p_rhs = -(u_x ** 2 + 2.0 * u_y * v_x + v_y ** 2)  # pressure-Poisson จาก NS + incompressibility
+            p_rhs = -(u_x ** 2 + 2.0 * u_y * v_x + v_y ** 2)
             p_s = solve_poisson_fft(p_rhs)
             saved_fields[t_save] = (u_s, v_s, p_s)
 
@@ -122,9 +102,6 @@ print("FDM time-marching finished!")
 print(f"Total computation time: {total_fdm_time:.2f} s ({total_fdm_time / 60.0:.2f} min)")
 print(f"Average time per step: {total_fdm_time / n_steps:.4f} s")
 
-# =====================================================================
-# 5. Evaluation: Relative L2 error ที่หลายค่า t (เทียบรูปแบบเดียวกับฝั่ง PINN)
-# =====================================================================
 def relative_l2_error(pred, exact):
     return np.linalg.norm(pred - exact) / (np.linalg.norm(exact) + 1e-12)
 
@@ -141,9 +118,6 @@ for t_value in save_times:
         f"L2(p) = {relative_l2_error(p_pred, p_exact):.4e}"
     )
 
-# =====================================================================
-# 6. Plot ผลลัพธ์ที่ t=10 (เทียบรูปแบบเดียวกับฝั่ง PINN)
-# =====================================================================
 plot_time = 10.0
 u_pred, v_pred, p_pred = saved_fields[plot_time]
 u_exact, v_exact, p_exact = exact_solution(X, Y, plot_time)

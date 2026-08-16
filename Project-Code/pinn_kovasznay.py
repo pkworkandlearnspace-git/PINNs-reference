@@ -56,8 +56,8 @@ N_collocation = 8192
 N_boundary = 8192
 
 #PINNs collocations
-x_c = torch.empty(N_collocation, 1, device=device).uniform_(-0.5, 1.0).requires_grad_(True)  # <-- FIX: to(device)
-y_c = torch.empty(N_collocation, 1, device=device).uniform_(-0.5, 1.5).requires_grad_(True)  # <-- FIX: to(device)
+x_c = torch.empty(N_collocation, 1, device=device).uniform_(-0.5, 1.0).requires_grad_(True)
+y_c = torch.empty(N_collocation, 1, device=device).uniform_(-0.5, 1.5).requires_grad_(True)
 
 #boundary points
 x_b_np = np.concatenate([
